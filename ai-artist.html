@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AI Artist</title>
+    <link rel="stylesheet" href="stylesheet.css">
+  </head>
+  <body style="overflow: hidden; margin: 0; padding: 0; font-family:sans-serif;">
+
+    
+
+    <div class="navbar">
+      <h1>AI Artist.</h1>
+      <div class="menubar">
+        <button>Frontpage</button>
+        <button>About</button>
+      </div>
+    </div>
+
+    
+    
+    <canvas id="cvs" style="display: block; width: 100%; height: 50%; background-color: #ffffff00; position: absolute; top: -5%;"></canvas>
+
+    <div class="progressCont">
+      <h2>Generating Album</h2>
+      <div class="progressFrame">
+        <div class="progressBar"></div>
+      </div>
+      <h3 id="operation">Initializing First Album...</h3>
+    </div>
+
+    <div class="customCursor"></div>
+    
+
+    <script type="module">
+
+      import * as THREE from "./three_js/three.module.js";
+      import { OrbitControls } from "./three_js/OrbitControls.js";
+      import * as dat from "./three_js/dat.gui.module.js";
+      import { GLTFLoader } from "./three_js/GLTFLoader.js";
+
+      //THREE
+
+      const cvs = document.getElementById("cvs");
+
+      let scene = null,
+        renderer = null,
+        camera = null;
+      let aspectRatio = window.innerWidth / (window.innerHeight);
+
+      let mixer;
+
+      function Init3DWorld() {
+        // Set up your world scene
+        scene = new THREE.Scene();
+        scene.background = null;
+      
+
+        // Set up your scene light
+        AddLights();
+
+        // Setup Your scene camera
+        camera = new THREE.PerspectiveCamera(48, aspectRatio, 1, 12);
+        //camera = new THREE.OrthographicCamera( 100 / - 2, 100 / 2, 100 / 2, 100 / - 2, 0, 200 );
+        camera.position.set(12, 0, 0);
+        camera.lookAt(0, 0, 0);
+
+
+        // Setup your scene models
+        LoadModels(scene);
+
+        // Set up your world renderer
+        const world = {
+          canvas: cvs,
+          antialias: true,
+        };
+        renderer = new THREE.WebGLRenderer(world, {alpha: true});
+        renderer.setClearColor( 0x000000, 0 );
+        renderer.setPixelRatio(aspectRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        //renderer.shadowMap.enabled = true;
+
+        //CONTROLS
+
+        //const controls = new OrbitControls(camera, renderer.domElement);
+        //controls.minPolarAngle = 0;
+        //controls.target.set(0, 0, 0);
+        //controls.update();
+
+        requestAnimationFrame(UpdateFrame);
+      }
+
+      function Resize(aWindow) {
+        aspectRatio = window.innerWidth / window.innerHeight;
+        camera.aspect = aspectRatio;
+        camera.updateProjectionMatrix();
+        renderer.setSize(aWindow.innerWidth, aWindow.innerHeight);
+      }
+
+      function UpdateFrame() {
+        renderer.render(scene, camera);
+        requestAnimationFrame(UpdateFrame);
+      }
+
+      function AddLights() {
+        const illumination = 0.5;
+        let light = new THREE.DirectionalLight("#ffffff", illumination);
+        light.position.set(0, 100, 400);
+        scene.add(light);
+
+        light = new THREE.AmbientLight( 0x404040, 2.5 ); // soft white light
+        scene.add( light );
+
+      }
+
+      let eyeball;
+
+      function LoadModels() {
+        const loader = new GLTFLoader();
+        loader.load("eyeball.gltf", GLTFLoadDone);
+      }
+
+      let clips;
+
+      function GLTFLoadDone(GLTFStructure) {
+        GLTFStructure.scene.traverse(GLTFEachObject);
+        scene.add(GLTFStructure.scene);
+
+        setInterval(AnimateObjects, 33,33);
+
+        mixer = new THREE.AnimationMixer( GLTFStructure.scene );
+        clips = GLTFStructure.animations;
+        const clip = THREE.AnimationClip;
+        console.log(clips);
+        clips.forEach( function ( clip ) {
+          
+        	mixer.clipAction( clip ).play();
+        } );
+        if(!play){
+          mixer.timeScale = 0;
+        }
+        
+      }
+
+      let eyeballObj;
+      let eyelidObj;
+      let eyeMat = new THREE.MeshBasicMaterial();
+      //eyeMat.emissive = new THREE.Color("rgb(255, 171, 3)");
+      //eyeMat.emissiveIntensity = 1;
+      eyeMat.color = new THREE.Color("rgb(255, 214, 92)");
+
+      function GLTFEachObject(aObject) {
+        console.log(aObject);
+
+        if (aObject.isMesh) {
+          aObject.castShadow = true;
+          aObject.receiveShadow = true;
+        } else if (aObject.isGroup) {
+          aObject.castShadow = true;
+        }
+
+        if(aObject.name == "eyeball"){
+          eyeballObj = aObject;
+          eyeballObj.material = eyeMat;
+        }
+        if(aObject.name == "eyelid"){
+          eyelidObj = aObject;
+          eyelidObj.material = eyeMat;
+        }
+
+      }
+
+      let mouseX;
+      let mouseY;
+
+      const customCursor = document.querySelector(".customCursor");
+
+      document.addEventListener('mousemove', (e) => {
+        mouseX = (e.clientX - window.innerWidth * 0.5) / 1000;
+        mouseY = (e.clientY - window.innerHeight * 0.5) / 1000;
+
+        customCursor.style.top = e.clientY + "px";
+        customCursor.style.left = e.clientX + "px";
+
+        
+        //console.log(`Mouse X: ${mouseX}, Mouse Y: ${mouseY}`);
+        //console.log(eyeballObj.scale.z)
+      });
+
+
+      const clock = new THREE.Clock();
+
+      function AnimateObjects(e) {
+        eyelidObj.rotation.y = mouseX;
+        eyelidObj.rotation.z = -mouseY;
+        eyeballObj.rotation.y = mouseX;
+        eyeballObj.rotation.z = -mouseY;
+
+        mixer.update(clock.getDelta());
+
+        const randomValue = Math.floor(Math.random() * 201);
+        //console.log(randomValue);
+        if(randomValue == 0){
+          wink()
+        }
+      }
+
+      function wink(){
+        mixer.timeScale = 1;
+        setTimeout(function(){
+         	mixer.timeScale = 0;
+          mixer.setTime(0);
+        }, 350);
+      }
+
+      document.addEventListener("mousedown", function(){
+        wink();
+      })
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      window.addEventListener("resize", onWindowResize, false);
+
+      Init3DWorld(cvs);
+    </script>
+
+    <script>
+    
+      let play = false;
+    
+      const progressBar = document.querySelector(".progressBar");
+      const operation = document.getElementById("operation");
+    
+      let i = 0;
+      let delay = 100;
+    
+      //Wordbanks
+
+      const actionList = ["cleaning up", "initializing", "creating", "fixing", "finetuning", "altering", "converting", "replacing", "generating", "bouncing", "compressing", "equalizing"];
+      const elementList = ["drums" ,"kick drum", "hihats", "cymbals", "claps", "snares", "percussion", "melody", "lead", "synth", "bass", "lead vocal", "vocals", "background vocals", "adlibs", "guitar", "woodwinds", "brass","strings", "synthesizer", "granular effects", "reverbs", "delays", "genre", "style" ];
+      const sectionList = ["1. verse", "2. verse", "3. verse", "chorus", "pre-chorus", "drop", "bridge", "mid-8", "intro", "outro", "buildup", "breakdown", "verses", "choruses"];
+    
+      function generateLoad(){
+      
+        const action = Math.floor(Math.random() * actionList.length);
+        const element = Math.floor(Math.random() * elementList.length);
+        const section = Math.floor(Math.random() * sectionList.length); 
+      
+        operation.innerText = `${actionList[action]} ${elementList[element]} in the ${sectionList[section]}...`;
+      
+      
+        i = 0;
+        startLoad();
+      }
+    
+      function startLoad(){
+      
+        function delayedLoop() {
+
+          setTimeout(function() {
+            i++;
+            progressBar.style.width = i + "%";
+            const randomValue = Math.floor(Math.random() * 21);
+            //console.log(randomValue);
+            if(randomValue === 20){
+              delay = 1000;
+            }else if(randomValue < 8){
+              delay = 40;
+            }
+            else{
+              delay = 100;
+            }                  
+            if (i < 100) {          
+              delayedLoop();             
+            }else{
+              play = false;
+              generateLoad();
+            }                       
+          }, delay)
+        }
+        delayedLoop();
+      }
+    
+      generateLoad();
+    
+    </script>
+  </body>
+</html>
